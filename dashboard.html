@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Fysium</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="icon" type="image/png" href="favicon.ico">
+    <link rel="stylesheet" href="styles/dashboard.css">
+</head>
+<body>
+
+    <div class="dashboard-layout">
+        <!-- Menú Lateral -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="assets/FysiumApp_logo.png" alt="Fysium Logo" class="logo">
+            </div>
+            
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-tab="calendario">
+                    <i class="fa-regular fa-calendar-days"></i> Calendario
+                </button>
+                <button class="nav-item" data-tab="pacientes">
+                    <i class="fa-solid fa-users"></i> Mis Pacientes
+                </button>
+                <button class="nav-item" data-tab="nuevo-paciente">
+                    <i class="fa-solid fa-user-plus"></i> Nuevo Paciente
+                </button>
+                <button class="nav-item" data-tab="perfil">
+                    <i class="fa-regular fa-user"></i> Mi Perfil
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Cerrar Sesión
+                </button>
+            </div>
+        </aside>
+
+        <!-- Contenido Principal -->
+        <main class="main-content">
+            <header class="top-header">
+                <h1 id="pageTitle">Calendario</h1>
+                <div class="user-info">
+                    <span id="userNameHeader">Cargando...</span>
+                    <div class="avatar" id="userAvatarHeader">F</div>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                
+                <!-- Pestaña: CALENDARIO -->
+                <section id="tab-calendario" class="tab-pane active">
+                    <div class="calendar-layout">
+                        <!-- Columna Izquierda: Mes Completo -->
+                        <div class="calendar-month-view card">
+                            <div class="month-header flex-between mb-4">
+                                <button id="prevMonthBtn" class="icon-btn"><i class="fa-solid fa-chevron-left"></i></button>
+                                <h2 id="monthTitle">Cargando...</h2>
+                                <button id="nextMonthBtn" class="icon-btn"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                            <div class="weekdays">
+                                <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+                            </div>
+                            <div id="monthGrid" class="month-grid">
+                                <!-- Días generados por JS -->
+                            </div>
+                        </div>
+
+                        <!-- Columna Derecha: Citas del día seleccionado -->
+                        <div class="calendar-day-view card">
+                            <div class="day-header flex-between mb-4">
+                                <h3 id="selectedDayTitle">Selecciona un día</h3>
+                                <button id="addSessionBtn" class="primary-btn" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
+                                    <i class="fa-solid fa-plus"></i> Añadir Libre
+                                </button>
+                            </div>
+                            <div id="daySessionsList" class="day-sessions-list">
+                                <p class="text-light text-center mt-4">Cargando citas...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Añadir Horario -->
+                    <div id="addSessionModal" class="modal">
+                        <div class="modal-content">
+                            <h3>Nuevo Horario</h3>
+                            <div class="form-group">
+                                <label>Día</label>
+                                <input type="date" id="sessionDate" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label>Hora Inicio</label>
+                                <input type="time" id="sessionStart" class="form-control" step="1800">
+                            </div>
+                            <div class="form-group">
+                                <label>Hora Fin</label>
+                                <input type="time" id="sessionEnd" class="form-control" step="1800">
+                            </div>
+                            <div class="form-group">
+                                <label>Precio (€)</label>
+                                <input type="number" id="sessionPrice" class="form-control" placeholder="Ej: 50">
+                            </div>
+                            <div class="modal-actions">
+                                <button id="cancelSessionBtn" class="btn-text text-danger">Cancelar</button>
+                                <button id="saveSessionBtn" class="primary-btn">Guardar Horario</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Reservar (Manual) -->
+                    <div id="bookSessionModal" class="modal">
+                        <div class="modal-content">
+                            <h3>Reservar Sesión (Manual)</h3>
+                            <p class="text-light mb-4">Ingresa el nombre del paciente para esta sesión reservada.</p>
+                            <div class="form-group">
+                                <label>Nombre del Paciente</label>
+                                <input type="text" id="manualPatientName" class="form-control" placeholder="Ej: Juan Pérez">
+                            </div>
+                            <div class="modal-actions">
+                                <button id="cancelBookBtn" class="btn-text text-danger">Cancelar</button>
+                                <button id="confirmBookBtn" class="primary-btn">Confirmar Reserva</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Pestaña: PACIENTES -->
+                <section id="tab-pacientes" class="tab-pane">
+                    <div class="card">
+                        <div class="card-header flex-between">
+                            <h2>Mis Pacientes Guardados</h2>
+                            <div class="search-box">
+                                <i class="fa-solid fa-search"></i>
+                                <input type="text" id="searchPatientInput" placeholder="Buscar paciente..." class="form-control">
+                            </div>
+                        </div>
+                        <div class="patients-list" id="patientsList">
+                            <div class="loading-spinner">Cargando pacientes...</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sub-Pestaña: DETALLE PACIENTE -->
+                <section id="tab-detalle-paciente" class="tab-pane">
+                    <div class="flex-between mb-4">
+                        <button id="backToPatientsBtn" class="btn-text" style="color: var(--primary);">
+                            <i class="fa-solid fa-arrow-left"></i> Volver a Pacientes
+                        </button>
+                    </div>
+                    
+                    <div class="calendar-layout">
+                        <!-- Info Básica y Tratamiento -->
+                        <div class="card">
+                            <div class="profile-header text-center mb-4">
+                                <div class="avatar-large mx-auto" id="dpAvatar">P</div>
+                                <h3 id="dpName" class="mt-2">Nombre Paciente</h3>
+                            </div>
+                            
+                            <div class="flex-between text-light mb-4 text-center">
+                                <div style="flex:1"><i class="fa-solid fa-phone"></i> <br><span id="dpPhone">--</span></div>
+                                <div style="flex:1"><i class="fa-solid fa-envelope"></i> <br><span id="dpEmail">--</span></div>
+                                <div style="flex:1"><i class="fa-solid fa-cake-candles"></i> <br><span id="dpDob">--</span></div>
+                            </div>
+                            
+                            <hr style="border:0; border-top:1px solid var(--border); margin: 1.5rem 0;">
+                            
+                            <!-- Recomendaciones y Ejercicios -->
+                            <div class="mb-4">
+                                <h4><i class="fa-solid fa-dumbbell" style="color: var(--primary)"></i> Recomendaciones y Ejercicios</h4>
+                                <div id="dpRecomendaciones" class="recommendation-grid mt-3">
+                                    <!-- Generado por JS -->
+                                </div>
+                            </div>
+
+                            <!-- Duración -->
+                            <div class="mb-4">
+                                <h4><i class="fa-solid fa-stopwatch" style="color: var(--primary)"></i> Duración del Tratamiento</h4>
+                                <div class="duration-controls mt-2" id="dpDuracion">
+                                    <div class="duration-group">
+                                        <label>Días</label>
+                                        <div class="btn-group" data-type="días">
+                                            <button class="dur-btn" data-val="1">1</button><button class="dur-btn" data-val="2">2</button><button class="dur-btn" data-val="3">3</button><button class="dur-btn" data-val="4">4</button><button class="dur-btn" data-val="5">5</button><button class="dur-btn" data-val="6">6</button>
+                                        </div>
+                                    </div>
+                                    <div class="duration-group mt-2">
+                                        <label>Semanas</label>
+                                        <div class="btn-group" data-type="semanas">
+                                            <button class="dur-btn active" data-val="1">1</button><button class="dur-btn" data-val="2">2</button><button class="dur-btn" data-val="3">3</button>
+                                        </div>
+                                    </div>
+                                    <div class="duration-group mt-2">
+                                        <label>Meses</label>
+                                        <div class="btn-group" data-type="meses">
+                                            <button class="dur-btn" data-val="1">1</button><button class="dur-btn" data-val="2">2</button><button class="dur-btn" data-val="3">3</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Notas para el paciente -->
+                            <div class="mb-4">
+                                <h4><i class="fa-solid fa-file-signature" style="color: #e74c3c"></i> Notas para el Paciente</h4>
+                                <textarea id="dpNotas" class="form-control mt-2" style="height: 100px; resize: vertical;" placeholder="Ej: Reposo activo, aplicar frío tras ejercicio..."></textarea>
+                            </div>
+
+                            <hr style="border:0; border-top:1px solid var(--border); margin: 1.5rem 0;">
+                            
+                            <div class="private-box mb-4">
+                                <h4><i class="fa-solid fa-lock" style="color: #D97706"></i> Tratamiento Privado</h4>
+                                <p style="font-size: 0.85rem; margin-bottom: 1rem; color: #92400E;">Solo tú puedes ver estas notas.</p>
+                                <textarea id="dpTratamiento" class="form-control" style="height: 150px; resize: vertical; border-color:#FDE68A; background:rgba(255,255,255,0.7)" placeholder="Anota aquí la evolución, diagnóstico..."></textarea>
+                            </div>
+                            
+                            <button id="saveTratamientoBtn" class="primary-btn w-100">Guardar Ficha</button>
+                        </div>
+                        
+                        <!-- Historial -->
+                        <div class="card" style="display: flex; flex-direction: column;">
+                            <h4 class="mb-4"><i class="fa-solid fa-clock-rotate-left" style="color: var(--accent)"></i> Historial de Tareas</h4>
+                            <div id="dpHistorialList" style="flex: 1; overflow-y: auto;">
+                                <p class="text-center text-light mt-4">Cargando historial...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Pestaña: NUEVO PACIENTE -->
+                <section id="tab-nuevo-paciente" class="tab-pane">
+                    <div class="card" style="max-width: 600px; margin: 0 auto;">
+                        <h2>Dar de alta un Paciente</h2>
+                        <p class="text-light mb-4">Crea un registro de paciente para poder asignarle citas manualmente. (Paciente fantasma)</p>
+                        
+                        <form id="newPatientForm">
+                            <div class="form-group">
+                                <label>Nombre y Apellidos *</label>
+                                <input type="text" id="np-name" class="form-control" required placeholder="Ej: María López">
+                            </div>
+                            <div class="form-group">
+                                <label>Correo Electrónico (Opcional)</label>
+                                <input type="email" id="np-email" class="form-control" placeholder="maria@ejemplo.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Teléfono (Opcional)</label>
+                                <input type="tel" id="np-phone" class="form-control" placeholder="600 000 000">
+                            </div>
+                            <button type="submit" class="primary-btn w-100 mt-4">Guardar Paciente</button>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- Pestaña: PERFIL -->
+                <section id="tab-perfil" class="tab-pane">
+                    <div class="card" style="max-width: 600px; margin: 0 auto;">
+                        <div class="text-center mb-4">
+                            <div class="avatar-large mx-auto mb-3" id="profileAvatarBig" style="font-size: 2.5rem;">F</div>
+                            <h2 id="profileTitleName">Cargando...</h2>
+                            <p class="text-light" id="profileTitleRole">Fisioterapeuta</p>
+                        </div>
+                        
+                        <form id="profileForm">
+                            <div class="form-group mb-4">
+                                <label><i class="fa-solid fa-user text-light"></i> Nombre de Usuario</label>
+                                <input type="text" id="profName" class="form-control" required>
+                            </div>
+                            
+                            <div class="form-group mb-4">
+                                <label><i class="fa-solid fa-envelope text-light"></i> Email</label>
+                                <input type="email" id="profEmail" class="form-control" disabled style="background-color: #f1f1f1; cursor: not-allowed;" title="El email no se puede cambiar por seguridad">
+                            </div>
+
+                            <hr style="border:0; border-top:1px solid var(--border); margin: 2rem 0;">
+                            <h4 style="color: var(--primary); margin-bottom: 1rem;">Panel de Fisioterapeuta</h4>
+
+                            <div class="form-group mb-4">
+                                <label><i class="fa-solid fa-id-card text-light"></i> Número de Colegiado (Opcional)</label>
+                                <input type="text" id="profColegiado" class="form-control" placeholder="Ej: 12345">
+                            </div>
+
+                            <div class="form-group mb-4">
+                                <label><i class="fa-brands fa-instagram text-light"></i> Redes Sociales / Enlace (Opcional)</label>
+                                <input type="text" id="profRedes" class="form-control" placeholder="Ej: https://instagram.com/mi_fisio">
+                            </div>
+
+                            <div class="form-group mb-4">
+                                <label><i class="fa-solid fa-tags text-light"></i> Especialidades (Etiquetas)</label>
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="text" id="newSpecialtyInput" class="form-control" placeholder="Ej: Deportiva">
+                                    <button type="button" id="addSpecialtyBtn" class="primary-btn" style="padding: 0 1rem;"><i class="fa-solid fa-plus"></i></button>
+                                </div>
+                                <div id="specialtiesContainer" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+                                    <!-- Etiquetas generadas por JS -->
+                                </div>
+                            </div>
+
+                            <button type="submit" id="saveProfileBtn" class="primary-btn w-100 mt-4">Actualizar Perfil</button>
+                        </form>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/supabase-config.js"></script>
+    <script src="js/dashboard.js"></script>
+    <!-- Componentes de las pestañas -->
+    <script src="js/calendario.js"></script>
+    <script src="js/pacientes.js"></script>
+
+</body>
+</html>

@@ -61,6 +61,22 @@ header {
   object-fit: contain;
 }
 
+.login-btn {
+  background-color: var(--accent-color);
+  color: var(--white);
+  padding: 0.5rem 1.25rem;
+  border-radius: 20px;
+  font-weight: 600;
+  transition: var(--transition);
+}
+
+.login-btn:hover {
+  background-color: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(243, 153, 133, 0.3);
+  color: var(--white);
+}
+
 /* Hero Section */
 .hero {
   display: flex;
