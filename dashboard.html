@@ -306,6 +306,24 @@
         </main>
     </div>
 
+    <!-- Modal para Nueva Recomendación -->
+    <div id="newRecModal" class="rec-modal-overlay" style="display: none;">
+        <div class="rec-modal-content">
+            <h3 style="margin-bottom: 15px;">Crear Recomendación</h3>
+            
+            <label style="font-size: 13px; color: var(--text-light); margin-bottom: 5px; display: block;">Nombre (Ej: Masaje con hielo):</label>
+            <input type="text" id="customRecName" class="form-control mb-3" placeholder="Nombre de la recomendación" maxlength="25">
+
+            <label style="font-size: 13px; color: var(--text-light); margin-bottom: 10px; display: block;">Selecciona un icono:</label>
+            <div id="customRecIconsGrid" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-height: 200px; overflow-y: auto; padding-bottom: 10px; margin-bottom: 20px;">
+                <!-- Iconos renderizados por JS -->
+            </div>
+
+            <button id="addCustomRecBtn" class="primary-btn w-100 mb-2">AÑADIR A LA LISTA</button>
+            <button id="closeRecModalBtn" class="secondary-btn w-100" style="background: transparent; color: var(--danger); border: none;">Cancelar</button>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="js/supabase-config.js"></script>
     <script src="js/dashboard.js"></script>

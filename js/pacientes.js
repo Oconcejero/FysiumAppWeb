@@ -14,8 +14,15 @@ const CATALOGO_RECOMENDACIONES = [
 let selectedRecs = [];
 let allRecs = [...CATALOGO_RECOMENDACIONES];
 
+const ICONOS_CUSTOM = [
+    'fa-star', 'fa-heart-pulse', 'fa-suitcase-medical', 'fa-pills', 'fa-bandage', 'fa-bone',
+    'fa-person-running', 'fa-person-walking', 'fa-spa', 'fa-bicycle', 'fa-dumbbell', 'fa-baseball',
+    'fa-child-reaching', 'fa-person', 'fa-chair', 'fa-fire', 'fa-snowflake', 'fa-droplet', 'fa-stopwatch'
+];
+let selectedCustomIcon = 'fa-star';
+
 document.addEventListener('DOMContentLoaded', () => {
-    
+    // ... logic (leave intact)
     // Alta de Paciente
     const form = document.getElementById('newPatientForm');
     form.addEventListener('submit', async (e) => {
@@ -95,6 +102,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Creador de Recomendaciones (Modal)
+    document.getElementById('closeRecModalBtn').addEventListener('click', () => {
+        document.getElementById('newRecModal').style.display = 'none';
+    });
+
+    document.getElementById('addCustomRecBtn').addEventListener('click', () => {
+        const nombreStr = document.getElementById('customRecName').value.trim();
+        if(!nombreStr) return alert("Ponle un nombre a tu recomendación.");
+        
+        const idUnico = `custom_${Date.now()}`;
+        const itemCreado = { id: idUnico, nombre: nombreStr, icono: selectedCustomIcon, isCustom: true };
+
+        allRecs.push(itemCreado);
+        selectedRecs.push(idUnico);
+        
+        document.getElementById('newRecModal').style.display = 'none';
+        document.getElementById('customRecName').value = '';
+        selectedCustomIcon = 'fa-star';
+        
+        renderRecommendationsGrid();
+    });
+
     // Guardar Ficha Completa
     document.getElementById('saveTratamientoBtn').addEventListener('click', async () => {
         if(!currentPatientId) return;
@@ -166,6 +195,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+function renderCustomIcons() {
+    const grid = document.getElementById('customRecIconsGrid');
+    grid.innerHTML = '';
+    ICONOS_CUSTOM.forEach(ico => {
+        const btn = document.createElement('div');
+        btn.className = `icon-selector ${selectedCustomIcon === ico ? 'active' : ''}`;
+        btn.innerHTML = `<i class="fa-solid ${ico}"></i>`;
+        btn.onclick = () => {
+            selectedCustomIcon = ico;
+            renderCustomIcons();
+        };
+        grid.appendChild(btn);
+    });
+}
+
 function renderRecommendationsGrid() {
     const grid = document.getElementById('dpRecomendaciones');
     grid.innerHTML = '';
@@ -181,6 +225,16 @@ function renderRecommendationsGrid() {
         };
         grid.appendChild(div);
     });
+
+    const newCard = document.createElement('div');
+    newCard.className = 'rec-card';
+    newCard.style.cssText = "background-color: #F0F5F5; border-style: dashed; border-width: 2px; border-color: var(--primary);";
+    newCard.innerHTML = `<i class="fa-solid fa-plus" style="color:var(--primary)"></i> <span style="color:var(--primary)">Nuevo</span>`;
+    newCard.onclick = () => {
+        document.getElementById('newRecModal').style.display = 'flex';
+        renderCustomIcons();
+    };
+    grid.appendChild(newCard);
 }
 
 window.cargarPacientes = async function() {
