@@ -339,6 +339,34 @@
     <script src="js/calendario.js"></script>
     <script src="js/pacientes.js"></script>
 
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const startSelect = document.getElementById('sessionStart');
+            const endSelect = document.getElementById('sessionEnd');
+
+            if (startSelect && endSelect) {
+                let optionsHTML = '';
+                // Recorremos las 24 horas del día
+                for (let h = 0; h < 24; h++) {
+                    const horaStr = String(h).padStart(2, '0');
+                    // Saltamos de 15 en 15 minutos
+                    for (let m = 0; m < 60; m += 15) {
+                        const minStr = String(m).padStart(2, '0');
+                        const tiempo = `${horaStr}:${minStr}`;
+                        optionsHTML += `<option value="${tiempo}">${tiempo}</option>`;
+                    }
+                }
+
+                startSelect.innerHTML = optionsHTML;
+                endSelect.innerHTML = optionsHTML;
+
+                // Ponemos unos valores por defecto bonitos para que no empiece en las 00:00
+                startSelect.value = "09:00";
+                endSelect.value = "10:00";
+            }
+        });
+    </script>
+
 </body>
 
 </html>
