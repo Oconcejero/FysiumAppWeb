@@ -103,11 +103,32 @@
                             </div>
                             <div class="form-group">
                                 <label>Hora Inicio</label>
-                                <select id="sessionStart" class="form-control"></select>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <select id="sessionStartHour" class="form-control" style="flex: 1; text-align: center;"></select>
+                                    <span style="font-weight: bold; font-size: 1.2rem; color: #999;">:</span>
+                                    <select id="sessionStartMin" class="form-control" style="flex: 1; text-align: center;">
+                                        <option value="00">00</option>
+                                        <option value="15">15</option>
+                                        <option value="30">30</option>
+                                        <option value="45">45</option>
+                                    </select>
+                                </div>
+                                <input type="hidden" id="sessionStart">
                             </div>
+
                             <div class="form-group">
                                 <label>Hora Fin</label>
-                                <select id="sessionEnd" class="form-control"></select>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <select id="sessionEndHour" class="form-control" style="flex: 1; text-align: center;"></select>
+                                    <span style="font-weight: bold; font-size: 1.2rem; color: #999;">:</span>
+                                    <select id="sessionEndMin" class="form-control" style="flex: 1; text-align: center;">
+                                        <option value="00">00</option>
+                                        <option value="15">15</option>
+                                        <option value="30">30</option>
+                                        <option value="45">45</option>
+                                    </select>
+                                </div>
+                                <input type="hidden" id="sessionEnd">
                             </div>
                             <div class="form-group">
                                 <label>Precio (€)</label>
@@ -341,28 +362,45 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const startSelect = document.getElementById('sessionStart');
-            const endSelect = document.getElementById('sessionEnd');
+            const startHour = document.getElementById('sessionStartHour');
+            const startMin = document.getElementById('sessionStartMin');
+            const startHidden = document.getElementById('sessionStart');
 
-            if (startSelect && endSelect) {
-                let optionsHTML = '';
-                // Recorremos las 24 horas del día
+            const endHour = document.getElementById('sessionEndHour');
+            const endMin = document.getElementById('sessionEndMin');
+            const endHidden = document.getElementById('sessionEnd');
+
+            if (startHour && endHour) {
+                // Generamos de forma limpia un bucle de solo 24 opciones (las horas puras)
+                let hoursHTML = '';
                 for (let h = 0; h < 24; h++) {
                     const horaStr = String(h).padStart(2, '0');
-                    // Saltamos de 15 en 15 minutos
-                    for (let m = 0; m < 60; m += 15) {
-                        const minStr = String(m).padStart(2, '0');
-                        const tiempo = `${horaStr}:${minStr}`;
-                        optionsHTML += `<option value="${tiempo}">${tiempo}</option>`;
-                    }
+                    hoursHTML += `<option value="${horaStr}">${horaStr}</option>`;
                 }
 
-                startSelect.innerHTML = optionsHTML;
-                endSelect.innerHTML = optionsHTML;
+                startHour.innerHTML = hoursHTML;
+                endHour.innerHTML = hoursHTML;
 
-                // Ponemos unos valores por defecto bonitos para que no empiece en las 00:00
-                startSelect.value = "09:00";
-                endSelect.value = "10:00";
+                // Valores por defecto elegantes (9:00 a 10:00)
+                startHour.value = "09";
+                startMin.value = "00";
+                endHour.value = "10";
+                endMin.value = "00";
+
+                // Función mágica que unifica los datos al formato que espera Supabase ("HH:MM")
+                const actualizarInputsOcultos = () => {
+                    startHidden.value = `${startHour.value}:${startMin.value}`;
+                    endHidden.value = `${endHour.value}:${endMin.value}`;
+                };
+
+                // Escuchamos los cambios de los selectores visuales
+                startHour.addEventListener('change', actualizarInputsOcultos);
+                startMin.addEventListener('change', actualizarInputsOcultos);
+                endHour.addEventListener('change', actualizarInputsOcultos);
+                endMin.addEventListener('change', actualizarInputsOcultos);
+
+                // Inicializamos los valores por primera vez en segundo plano
+                actualizarInputsOcultos();
             }
         });
     </script>
