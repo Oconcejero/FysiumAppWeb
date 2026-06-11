@@ -32,6 +32,13 @@ document.addEventListener('DOMContentLoaded', () => {
         window.cargarCalendarioMes();
     });
 
+    addSafeEventListener('addSessionBtn', 'click', () => {
+        const addSessionModal = document.getElementById('addSessionModal');
+        if (addSessionModal) {
+            addSessionModal.classList.add('active');
+        }
+    });
+
     addSafeEventListener('nextMonthBtn', 'click', () => {
         currentMonth.setMonth(currentMonth.getMonth() + 1);
         window.cargarCalendarioMes();
@@ -44,19 +51,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 5. Guardar Sesión Libre
     addSafeEventListener('saveSessionBtn', 'click', async () => {
+        console.log("1. Botón Guardar pulsado");
+
         const diaInput = document.getElementById('sessionDate');
         const inicioInput = document.getElementById('sessionStart');
         const finInput = document.getElementById('sessionEnd');
         const precioInput = document.getElementById('sessionPrice');
 
-        if (!diaInput || !inicioInput || !finInput || !precioInput) return;
+        if (!diaInput || !inicioInput || !finInput || !precioInput) {
+            console.error("2. ERROR: No se encuentran los campos en el HTML. Revisa los IDs.");
+            return;
+        }
 
         const dia = diaInput.value;
         const inicio = inicioInput.value;
         const fin = finInput.value;
         const precio = precioInput.value;
 
-        if (!dia || !inicio || !fin || !precio) return alert('Completa todos los campos');
+        if (!dia || !inicio || !fin || !precio) {
+            console.warn("3. Faltan campos por rellenar");
+            return alert('Completa todos los campos');
+        }
+
+        console.log("4. Intentando guardar en Supabase...", { dia, inicio, fin, precio });
+
+        const btn = document.getElementById('saveSessionBtn');
+        if (btn) btn.textContent = "Guardando...";
 
         try {
             const { error } = await supabaseClient
@@ -71,11 +91,66 @@ document.addEventListener('DOMContentLoaded', () => {
                 }]);
 
             if (error) throw error;
+            console.log("5. Sesión guardada con éxito en la base de datos.");
+
+            // --- INICIO BLOQUE NOTIFICACIÓN: AVISO A FAVORITOS ---
+            try {
+                // 1. Buscamos qué pacientes tienen a este fisio en favoritos
+                const { data: listaFavoritos } = await supabaseClient
+                    .from('favoritos')
+                    .select('user_id')
+                    .eq('fisio_id', currentUser.id);
+
+                if (listaFavoritos && listaFavoritos.length > 0) {
+                    const idsPacientes = listaFavoritos.map(f => f.user_id);
+
+                    // CORRECCIÓN: Si el array de IDs está vacío, Supabase da error en el .in()
+                    if (idsPacientes.length > 0) {
+                        // 2. Buscamos sus tokens y preferencias
+                        const { data: usuarios } = await supabaseClient
+                            .from('auth_user')
+                            .select('push_token, alertas_nuevas_horas')
+                            .in('id_supabase', idsPacientes);
+
+                        const fechaBonita = dia.split('-').reverse().join('/');
+
+                        // 3. Enviamos el Push a los que lo permitan
+                        for (const u of (usuarios || [])) {
+                            if (u.push_token && (u.alertas_nuevas_horas === true || u.alertas_nuevas_horas === null)) {
+                                await fetch('https://corsproxy.io/?https://exp.host/--/api/v2/push/send', {
+                                    method: 'POST',
+                                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        to: u.push_token,
+                                        sound: 'default',
+                                        title: '🔥 ¡Nuevos horarios disponibles!',
+                                        body: `Tu fisio favorito acaba de publicar sesiones libres el ${fechaBonita} a las ${inicio}. ¡Corre a reservar!`
+                                    })
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Error silencioso avisando a favoritos:", err);
+            }
+            // --- FIN BLOQUE NOTIFICACIÓN ---
+
+            console.log("6. Cerrando modal y recargando calendario");
+            const addSessionModal = document.getElementById('addSessionModal');
             if (addSessionModal) addSessionModal.classList.remove('active');
+
+            // Limpiamos los campos para la próxima vez
+            diaInput.value = '';
+            inicioInput.value = '';
+            finInput.value = '';
+
             window.cargarCalendarioMes();
         } catch (error) {
-            console.error(error);
-            alert("Error al guardar la sesión.");
+            console.error("ERROR CRÍTICO:", error);
+            alert("Error al guardar la sesión: " + error.message);
+        } finally {
+            if (btn) btn.textContent = "Guardar Sesión"; // Restauramos el texto del botón
         }
     });
 });
@@ -365,6 +440,43 @@ window.reservarPacienteExistente = async function (clienteId, nombre) {
             .eq('id', sessionId);
 
         if (errorCita) throw errorCita;
+
+        try {
+            // Buscamos las preferencias del paciente
+            const { data: userPref } = await supabaseClient
+                .from('auth_user')
+                .select('push_token, alertas_citas')
+                .eq('id_supabase', clienteId)
+                .single();
+
+            // Si tiene token y no ha desactivado las alertas, le avisamos
+            if (userPref && userPref.push_token && (userPref.alertas_citas === true || userPref.alertas_citas === null)) {
+
+                // Necesitamos consultar la fecha y hora de la cita que acabamos de reservar
+                const { data: citaInfo } = await supabaseClient
+                    .from('horarios_disponibles')
+                    .select('dia, hora')
+                    .eq('id', sessionId)
+                    .single();
+
+                if (citaInfo) {
+                    const fechaBonita = citaInfo.dia.split('-').reverse().join('/');
+
+                    await fetch('https://corsproxy.io/?https://exp.host/--/api/v2/push/send', {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            to: userPref.push_token,
+                            sound: 'default',
+                            title: '📅 Nueva Cita Programada',
+                            body: `Tu fisioterapeuta te ha reservado una sesión el ${fechaBonita} a las ${citaInfo.hora}.`
+                        })
+                    });
+                }
+            }
+        } catch (err) {
+            console.error("Error enviando alerta de cita al paciente:", err);
+        }
 
         modal.classList.remove('active');
         window.cargarCalendarioMes();

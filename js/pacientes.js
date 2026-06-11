@@ -194,6 +194,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 duracion_texto: duracionTexto
             }]);
 
+            try {
+                // 1. Buscamos el token y si el paciente permite alertas de seguimiento
+                const { data: userPref } = await supabaseClient
+                    .from('auth_user')
+                    .select('push_token, alertas_seguimiento')
+                    .eq('id_supabase', currentPatientId)
+                    .single();
+
+                // 2. Si tiene token y el interruptor está activo (o es null/por defecto), disparamos
+                if (userPref && userPref.push_token && (userPref.alertas_seguimiento === true || userPref.alertas_seguimiento === null)) {
+                    await fetch('https://exp.host/--/api/v2/push/send', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Accept-encoding': 'gzip, deflate',
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            to: userPref.push_token,
+                            sound: 'default',
+                            title: '💪 Plan de Seguimiento Actualizado',
+                            body: `Tu fisioterapeuta, ${currentUser.user_metadata?.username || 'tu fisio'}, ha actualizado tus recomendaciones.`
+                        })
+                    });
+                }
+            } catch (errNotif) {
+                console.error("Error silencioso al notificar al paciente:", errNotif);
+            }
+
             alert("Ficha guardada correctamente y añadida al historial.");
             window.cargarFichaPaciente({ id_supabase: currentPatientId, ...window.currentPatientObj }); // Recargar historial
         } catch (e) {
