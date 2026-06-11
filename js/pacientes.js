@@ -27,21 +27,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('newPatientForm');
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const nombre = document.getElementById('np-name').value.trim();
         const email = document.getElementById('np-email').value.trim();
         const phone = document.getElementById('np-phone').value.trim();
+
+        // AÑADIDO: Capturamos la fecha de nacimiento si el elemento existe
+        const dobInput = document.getElementById('np-dob');
+        const dob = dobInput ? dobInput.value.trim() : null;
+
         const btn = form.querySelector('button');
-        
-        if(!nombre) return;
+
+        if (!nombre) return;
         btn.disabled = true;
-        btn.textContent = "Guardando...";
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
 
         try {
-            const uuid = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const uuid = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
                 var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
                 return v.toString(16);
             });
+
+            const emailFinal = email || `fantasma.${Math.random().toString(36).substring(2, 8)}@fysium.app`;
 
             const { error: errorUser } = await supabaseClient
                 .from('auth_user')
@@ -49,23 +56,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     id_supabase: uuid,
                     username: nombre,
                     telefono: phone || null,
-                    email: email || `fantasma.${Math.random().toString(36).substring(2,8)}@fysium.app`,
+                    email: emailFinal,
+                    fecha_nacimiento: dob || null, // Guardamos la fecha
                     es_fantasma: true
                 }]);
-            
-            if(errorUser && errorUser.code !== '23505') throw errorUser;
+
+            if (errorUser && errorUser.code !== '23505') throw errorUser;
 
             const { error: errorMis } = await supabaseClient
                 .from('mis_pacientes')
                 .insert([{ fisio_id: currentUser.id, cliente_id: uuid }]);
 
-            if(errorMis && errorMis.code !== '23505') throw errorMis;
+            if (errorMis && errorMis.code !== '23505') throw errorMis;
 
             alert('Paciente dado de alta y añadido a tu lista exitosamente.');
             form.reset();
-            
-            if(window.cargarPacientes) window.cargarPacientes();
-            document.querySelector('[data-tab="pacientes"]').click();
+
+            if (window.cargarPacientes) window.cargarPacientes();
+
+            // Navega automáticamente a la pestaña de pacientes
+            const tabPacientes = document.querySelector('[data-tab="pacientes"]');
+            if (tabPacientes) tabPacientes.click();
 
         } catch (error) {
             console.error(error);
@@ -82,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cards = document.querySelectorAll('.patient-card');
         cards.forEach(card => {
             const name = card.querySelector('.patient-name').textContent.toLowerCase();
-            if(name.includes(val)) card.style.display = 'flex';
+            if (name.includes(val)) card.style.display = 'flex';
             else card.style.display = 'none';
         });
     });
@@ -109,31 +120,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('addCustomRecBtn').addEventListener('click', () => {
         const nombreStr = document.getElementById('customRecName').value.trim();
-        if(!nombreStr) return alert("Ponle un nombre a tu recomendación.");
-        
+        if (!nombreStr) return alert("Ponle un nombre a tu recomendación.");
+
         const idUnico = `custom_${Date.now()}`;
         const itemCreado = { id: idUnico, nombre: nombreStr, icono: selectedCustomIcon, isCustom: true };
 
         allRecs.push(itemCreado);
         selectedRecs.push(idUnico);
-        
+
         document.getElementById('newRecModal').style.display = 'none';
         document.getElementById('customRecName').value = '';
         selectedCustomIcon = 'fa-star';
-        
+
         renderRecommendationsGrid();
     });
 
     // Guardar Ficha Completa
     document.getElementById('saveTratamientoBtn').addEventListener('click', async () => {
-        if(!currentPatientId) return;
+        if (!currentPatientId) return;
         const btn = document.getElementById('saveTratamientoBtn');
         btn.disabled = true;
         btn.textContent = "Guardando...";
 
         const textoPrivado = document.getElementById('dpTratamiento').value;
         const notas = document.getElementById('dpNotas').value;
-        
+
         // Obtener duración
         const activeDurBtn = document.querySelector('.dur-btn.active');
         const durVal = activeDurBtn ? activeDurBtn.dataset.val : 1;
@@ -142,9 +153,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Obtener fecha fin
         const fechaFin = new Date();
-        if(durType === 'días') fechaFin.setDate(fechaFin.getDate() + parseInt(durVal));
-        else if(durType === 'semanas') fechaFin.setDate(fechaFin.getDate() + (parseInt(durVal) * 7));
-        else if(durType === 'meses') fechaFin.setMonth(fechaFin.getMonth() + parseInt(durVal));
+        if (durType === 'días') fechaFin.setDate(fechaFin.getDate() + parseInt(durVal));
+        else if (durType === 'semanas') fechaFin.setDate(fechaFin.getDate() + (parseInt(durVal) * 7));
+        else if (durType === 'meses') fechaFin.setMonth(fechaFin.getMonth() + parseInt(durVal));
 
         // Obtener array de ejercicios
         const arrayCompleto = selectedRecs.map(idItem => allRecs.find(e => e.id === idItem)).filter(Boolean);
@@ -160,16 +171,16 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            if(currentPlanId) {
+            if (currentPlanId) {
                 const { error } = await supabaseClient.from('planes_recuperacion').update(dataPayload).eq('id', currentPlanId);
-                if(error) throw error;
+                if (error) throw error;
             } else {
                 const { data, error } = await supabaseClient.from('planes_recuperacion').insert([{
                     fisio_id: currentUser.id,
                     cliente_id: currentPatientId,
                     ...dataPayload
                 }]).select('id').single();
-                if(error) throw error;
+                if (error) throw error;
                 currentPlanId = data.id;
             }
 
@@ -185,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             alert("Ficha guardada correctamente y añadida al historial.");
             window.cargarFichaPaciente({ id_supabase: currentPatientId, ...window.currentPatientObj }); // Recargar historial
-        } catch(e) {
+        } catch (e) {
             console.error(e);
             alert("Error al guardar: " + e.message);
         } finally {
@@ -213,13 +224,13 @@ function renderCustomIcons() {
 function renderRecommendationsGrid() {
     const grid = document.getElementById('dpRecomendaciones');
     grid.innerHTML = '';
-    
+
     allRecs.forEach(item => {
         const div = document.createElement('div');
         div.className = `rec-card ${selectedRecs.includes(item.id) ? 'active' : ''}`;
         div.innerHTML = `<i class="fa-solid ${item.icono}"></i> <span>${item.nombre}</span>`;
         div.onclick = () => {
-            if(selectedRecs.includes(item.id)) selectedRecs = selectedRecs.filter(i => i !== item.id);
+            if (selectedRecs.includes(item.id)) selectedRecs = selectedRecs.filter(i => i !== item.id);
             else selectedRecs.push(item.id);
             renderRecommendationsGrid();
         };
@@ -237,8 +248,8 @@ function renderRecommendationsGrid() {
     grid.appendChild(newCard);
 }
 
-window.cargarPacientes = async function() {
-    if(!currentUser) return;
+window.cargarPacientes = async function () {
+    if (!currentUser) return;
     const list = document.getElementById('patientsList');
     list.innerHTML = '<div class="loading-spinner py-4 text-center"><i class="fa fa-spinner fa-spin"></i> Cargando...</div>';
 
@@ -248,9 +259,9 @@ window.cargarPacientes = async function() {
             .select('cliente_id')
             .eq('fisio_id', currentUser.id);
 
-        if(errorMis) throw errorMis;
+        if (errorMis) throw errorMis;
 
-        if(!misPacientes || misPacientes.length === 0) {
+        if (!misPacientes || misPacientes.length === 0) {
             list.innerHTML = '<p class="text-center text-light py-4">Aún no tienes pacientes guardados.</p>';
             return;
         }
@@ -263,16 +274,16 @@ window.cargarPacientes = async function() {
             .in('id_supabase', ids)
             .order('username', { ascending: true });
 
-        if(errorUsr) throw errorUsr;
+        if (errorUsr) throw errorUsr;
 
         list.innerHTML = '';
         usuarios.forEach(u => {
             const card = document.createElement('div');
             card.className = 'patient-card';
             card.style.cursor = 'pointer';
-            
+
             let avatarHtml = `<div class="avatar">${u.username.charAt(0).toUpperCase()}</div>`;
-            if(u.foto_perfil_url) {
+            if (u.foto_perfil_url) {
                 avatarHtml = `<img src="${u.foto_perfil_url}" alt="${u.username}" class="avatar" style="object-fit:cover">`;
             }
 
@@ -294,13 +305,13 @@ window.cargarPacientes = async function() {
     }
 };
 
-window.cargarFichaPaciente = async function(userObj) {
+window.cargarFichaPaciente = async function (userObj) {
     window.currentPatientObj = userObj;
     currentPatientId = userObj.id_supabase;
     currentPlanId = null;
     selectedRecs = [];
     allRecs = [...CATALOGO_RECOMENDACIONES];
-    
+
     // Cambiar vista
     document.getElementById('tab-pacientes').classList.remove('active');
     document.getElementById('tab-detalle-paciente').classList.add('active');
@@ -308,11 +319,11 @@ window.cargarFichaPaciente = async function(userObj) {
     // Poblar info
     document.getElementById('dpName').textContent = userObj.username;
     document.getElementById('dpAvatar').textContent = userObj.username.charAt(0).toUpperCase();
-    if(userObj.foto_perfil_url) document.getElementById('dpAvatar').innerHTML = `<img src="${userObj.foto_perfil_url}" style="width:100%; height:100%; border-radius:50%; object-fit:cover">`;
+    if (userObj.foto_perfil_url) document.getElementById('dpAvatar').innerHTML = `<img src="${userObj.foto_perfil_url}" style="width:100%; height:100%; border-radius:50%; object-fit:cover">`;
     document.getElementById('dpPhone').textContent = userObj.telefono || 'Sin teléfono';
     document.getElementById('dpEmail').textContent = userObj.email || 'Sin correo';
     document.getElementById('dpDob').textContent = userObj.fecha_nacimiento || 'Sin fecha de nac.';
-    
+
     // Reset Form
     document.getElementById('dpTratamiento').value = 'Cargando...';
     document.getElementById('dpNotas').value = '';
@@ -326,32 +337,32 @@ window.cargarFichaPaciente = async function(userObj) {
         .eq('fisio_id', currentUser.id)
         .eq('cliente_id', currentPatientId)
         .single();
-        
-    if(planData) {
+
+    if (planData) {
         currentPlanId = planData.id;
         document.getElementById('dpTratamiento').value = planData.tratamiento_privado || '';
         document.getElementById('dpNotas').value = planData.reposo || '';
-        
+
         try {
-            if(planData.ejercicios) {
+            if (planData.ejercicios) {
                 const parsed = JSON.parse(planData.ejercicios);
                 const recIds = [];
                 parsed.forEach(i => {
                     const idObj = typeof i === 'string' ? i : i.id;
                     recIds.push(idObj);
-                    if(typeof i === 'object' && i.isCustom && !allRecs.find(e => e.id === i.id)) {
+                    if (typeof i === 'object' && i.isCustom && !allRecs.find(e => e.id === i.id)) {
                         allRecs.push({ id: i.id, nombre: i.nombre, icono: i.icono.replace('md-', 'fa-') });
                     }
                 });
                 selectedRecs = [...new Set(recIds)];
             }
-        } catch(e){}
+        } catch (e) { }
 
-        if(planData.duracion_texto) {
+        if (planData.duracion_texto) {
             const [val, type] = planData.duracion_texto.split(' ');
             document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('active'));
             const btn = document.querySelector(`.btn-group[data-type="${type}"] .dur-btn[data-val="${val}"]`);
-            if(btn) btn.classList.add('active');
+            if (btn) btn.classList.add('active');
         }
     } else {
         document.getElementById('dpTratamiento').value = '';
@@ -365,9 +376,9 @@ window.cargarFichaPaciente = async function(userObj) {
         .select('*')
         .eq('cliente_id', currentPatientId)
         .order('fecha', { ascending: false });
-        
+
     const hList = document.getElementById('dpHistorialList');
-    if(!histData || histData.length === 0) {
+    if (!histData || histData.length === 0) {
         hList.innerHTML = `<p class="text-light text-center" style="font-size:0.9rem; margin-top:2rem;"><i class="fa-solid fa-folder-open mb-2" style="font-size:2rem; opacity:0.5"></i><br>No hay historial todavía.</p>`;
     } else {
         hList.innerHTML = '';
@@ -375,18 +386,18 @@ window.cargarFichaPaciente = async function(userObj) {
             const dateStr = item.fecha ? item.fecha.split('T')[0] : 'Sin fecha';
             const dateObj = new Date(dateStr);
             const dateFormatted = dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            
+
             let pillsHtml = '';
             try {
-                if(item.ejercicios) {
+                if (item.ejercicios) {
                     const p = JSON.parse(item.ejercicios);
                     p.forEach(e => {
-                        const name = typeof e === 'string' ? (allRecs.find(r=>r.id===e)?.nombre || e) : e.nombre;
-                        const icon = typeof e === 'string' ? (allRecs.find(r=>r.id===e)?.icono || 'fa-dumbbell') : (e.icono ? e.icono.replace('md-', 'fa-') : 'fa-dumbbell');
+                        const name = typeof e === 'string' ? (allRecs.find(r => r.id === e)?.nombre || e) : e.nombre;
+                        const icon = typeof e === 'string' ? (allRecs.find(r => r.id === e)?.icono || 'fa-dumbbell') : (e.icono ? e.icono.replace('md-', 'fa-') : 'fa-dumbbell');
                         pillsHtml += `<div class="history-pill"><i class="fa-solid ${icon}" style="color:var(--primary)"></i> ${name}</div>`;
                     });
                 }
-            } catch(e){}
+            } catch (e) { }
 
             const html = `
                 <div class="history-card">
@@ -421,8 +432,8 @@ window.cargarFichaPaciente = async function(userObj) {
     }
 };
 
-window.borrarHistorial = async function(id) {
-    if(confirm('¿Seguro que quieres borrar este registro del historial?')) {
+window.borrarHistorial = async function (id) {
+    if (confirm('¿Seguro que quieres borrar este registro del historial?')) {
         try {
             await supabaseClient.from('historial_seguimiento').delete().eq('id', id);
             window.cargarFichaPaciente({ id_supabase: currentPatientId, ...window.currentPatientObj });
@@ -433,8 +444,8 @@ window.borrarHistorial = async function(id) {
     }
 }
 
-window.abrirPacienteDesdeCalendario = async function(clienteId) {
-    if(!clienteId) return;
+window.abrirPacienteDesdeCalendario = async function (clienteId) {
+    if (!clienteId) return;
 
     // Obtener datos del paciente
     const { data: userData, error } = await supabaseClient
@@ -443,7 +454,7 @@ window.abrirPacienteDesdeCalendario = async function(clienteId) {
         .eq('id_supabase', clienteId)
         .single();
 
-    if(error || !userData) {
+    if (error || !userData) {
         alert("No se pudo cargar la información de este paciente.");
         return;
     }
@@ -456,9 +467,9 @@ window.abrirPacienteDesdeCalendario = async function(clienteId) {
         .eq('cliente_id', clienteId)
         .single();
 
-    if(!misData) {
+    if (!misData) {
         const quiereGuardar = confirm(`El paciente ${userData.username || 'desconocido'} no está guardado en tu lista "Mis Pacientes". ¿Deseas añadirlo ahora para poder ver y editar su ficha de tratamiento?`);
-        if(quiereGuardar) {
+        if (quiereGuardar) {
             await supabaseClient.from('mis_pacientes').insert([{ fisio_id: currentUser.id, cliente_id: clienteId }]);
         } else {
             return; // Aborta si no quiere añadirlo
@@ -468,12 +479,12 @@ window.abrirPacienteDesdeCalendario = async function(clienteId) {
     // Navegar a la pestaña pacientes y abrir su ficha
     document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
     const pTab = document.querySelector('.nav-item[data-tab="pacientes"]');
-    if(pTab) pTab.classList.add('active');
-    
+    if (pTab) pTab.classList.add('active');
+
     document.getElementById('pageTitle').textContent = "Mis Pacientes";
 
     document.querySelectorAll('.tab-pane').forEach(tab => tab.classList.remove('active'));
-    document.getElementById('tab-pacientes').classList.remove('active'); 
-    
+    document.getElementById('tab-pacientes').classList.remove('active');
+
     window.cargarFichaPaciente(userData);
 };

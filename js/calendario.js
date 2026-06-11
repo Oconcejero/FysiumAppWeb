@@ -12,35 +12,49 @@ function formatearFecha(date) {
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Controles de mes
-    document.getElementById('prevMonthBtn').addEventListener('click', () => {
+    // 1. PRIMERO DEFINIMOS LA FUNCIÓN (Para que no dé el error "is not defined")
+    const addSafeEventListener = (id, event, callback) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener(event, callback);
+        } else {
+            console.warn(`[AVISO] No se encontró el botón: "${id}"`);
+        }
+    };
+
+    // 2. Modales
+    const addSessionModal = document.getElementById('addSessionModal');
+    const bookSessionModal = document.getElementById('bookSessionModal');
+
+    // 3. Controles de mes (Protegidos)
+    addSafeEventListener('prevMonthBtn', 'click', () => {
         currentMonth.setMonth(currentMonth.getMonth() - 1);
         window.cargarCalendarioMes();
     });
 
-    document.getElementById('nextMonthBtn').addEventListener('click', () => {
+    addSafeEventListener('nextMonthBtn', 'click', () => {
         currentMonth.setMonth(currentMonth.getMonth() + 1);
         window.cargarCalendarioMes();
     });
 
-    // Modales
-    const addSessionModal = document.getElementById('addSessionModal');
-    const bookSessionModal = document.getElementById('bookSessionModal');
-
-    document.getElementById('addSessionBtn').addEventListener('click', () => {
-        document.getElementById('sessionDate').value = formatearFecha(selectedDate);
-        addSessionModal.classList.add('active');
+    // 4. Botones para cerrar modales (Añade estos ids a tu HTML si no los tienes)
+    addSafeEventListener('cancelSessionBtn', 'click', () => {
+        if (addSessionModal) addSessionModal.classList.remove('active');
     });
 
-    document.getElementById('cancelSessionBtn').addEventListener('click', () => addSessionModal.classList.remove('active'));
-    document.getElementById('cancelBookBtn').addEventListener('click', () => bookSessionModal.classList.remove('active'));
+    // 5. Guardar Sesión Libre
+    addSafeEventListener('saveSessionBtn', 'click', async () => {
+        const diaInput = document.getElementById('sessionDate');
+        const inicioInput = document.getElementById('sessionStart');
+        const finInput = document.getElementById('sessionEnd');
+        const precioInput = document.getElementById('sessionPrice');
 
-    // Guardar Sesión Libre
-    document.getElementById('saveSessionBtn').addEventListener('click', async () => {
-        const dia = document.getElementById('sessionDate').value;
-        const inicio = document.getElementById('sessionStart').value;
-        const fin = document.getElementById('sessionEnd').value;
-        const precio = document.getElementById('sessionPrice').value;
+        if (!diaInput || !inicioInput || !finInput || !precioInput) return;
+
+        const dia = diaInput.value;
+        const inicio = inicioInput.value;
+        const fin = finInput.value;
+        const precio = precioInput.value;
 
         if (!dia || !inicio || !fin || !precio) return alert('Completa todos los campos');
 
@@ -57,56 +71,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }]);
 
             if (error) throw error;
-            addSessionModal.classList.remove('active');
-            window.cargarCalendarioMes(); // Recargar datos
+            if (addSessionModal) addSessionModal.classList.remove('active');
+            window.cargarCalendarioMes();
         } catch (error) {
             console.error(error);
             alert("Error al guardar la sesión.");
-        }
-    });
-
-    // Reservar manual
-    document.getElementById('confirmBookBtn').addEventListener('click', async () => {
-        const name = document.getElementById('manualPatientName').value.trim();
-        const sessionId = bookSessionModal.dataset.sessionId;
-
-        if (!name) return alert("Introduce un nombre");
-
-        try {
-            const uuid = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-            const email = `fantasma.${Math.random().toString(36).substring(2, 8)}@fysium.app`;
-
-            const { error: errorUser } = await supabaseClient
-                .from('auth_user')
-                .insert([{
-                    id_supabase: uuid,
-                    email: email,
-                    username: name,
-                    es_fantasma: true
-                }]);
-
-            if (errorUser && errorUser.code !== '23505') throw errorUser;
-
-            const { error: errorCita } = await supabaseClient
-                .from('horarios_disponibles')
-                .update({
-                    estado: 'reservado',
-                    cliente_id: uuid,
-                    nombre_paciente: name
-                })
-                .eq('id', sessionId);
-
-            if (errorCita) throw errorCita;
-
-            bookSessionModal.classList.remove('active');
-            window.cargarCalendarioMes();
-
-        } catch (error) {
-            console.error(error);
-            alert("Error al reservar: " + error.message);
         }
     });
 });
@@ -133,6 +102,7 @@ window.cargarCalendarioMes = async function () {
         .eq('fisio_id', currentUser.id)
         .gte('dia', formatearFecha(startOfMonth))
         .lte('dia', formatearFecha(endOfMonth))
+        .neq('estado', 'cancelado')
         .order('hora', { ascending: true });
 
     if (!error && data) {
@@ -255,14 +225,217 @@ function renderizarDiaSeleccionado() {
 
 window.openBookModal = function (id) {
     const modal = document.getElementById('bookSessionModal');
+    if (!modal) return;
+
     modal.dataset.sessionId = id;
-    document.getElementById('manualPatientName').value = '';
+
+    // Limpiar campos de "Nuevo Paciente"
+    const inputNombre = document.getElementById('nuevoNombre');
+    const inputEmail = document.getElementById('nuevoEmail');
+    if (inputNombre) inputNombre.value = '';
+    if (inputEmail) inputEmail.value = '';
+
+    // Limpiar el buscador
+    const buscador = document.getElementById('buscadorPaciente');
+    if (buscador) {
+        buscador.value = '';
+        window.filtrarPacientes();
+    }
+
+    window.mostrarSeccion('pacientes');
+
     modal.classList.add('active');
+
+    if (buscador) {
+        setTimeout(() => buscador.focus(), 100);
+    }
 }
 
 window.deleteSession = async function (id) {
-    if (confirm('¿Eliminar esta sesión libre?')) {
-        await supabaseClient.from('horarios_disponibles').delete().eq('id', id);
+    if (!confirm("¿Seguro que quieres eliminar esta cita?")) return;
+
+    const { error } = await supabaseClient
+        .from('horarios_disponibles')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+        alert("Error al eliminar: " + error.message);
+    } else {
+        // RECARGAR CALENDARIO
         window.cargarCalendarioMes();
     }
 }
+
+async function cargarPacientesParaModal() {
+    const lista = document.getElementById('listaPacientesGuardados');
+    const { data: misPacs } = await supabaseClient
+        .from('mis_pacientes')
+        .select('cliente_id, auth_user(username, foto_perfil_url)')
+        .eq('fisio_id', currentUser.id);
+
+    lista.innerHTML = misPacs.map(p => `
+        <li onclick="seleccionarPaciente('${p.auth_user.username}')" style="cursor:pointer; padding:10px; border-bottom:1px solid #eee">
+            <img src="${p.auth_user.foto_perfil_url || 'default-avatar.png'}" style="width:30px; border-radius:50%">
+            ${p.auth_user.username}
+        </li>
+    `).join('');
+}
+
+window.mostrarSeccion = function (seccion) {
+    document.getElementById('seccionPacientes').style.display = seccion === 'pacientes' ? 'block' : 'none';
+    document.getElementById('seccionNuevo').style.display = seccion === 'nuevo' ? 'block' : 'none';
+
+    const btnPac = document.getElementById('tabPacientesBtn');
+    const btnNuev = document.getElementById('tabNuevoBtn');
+    if (btnPac && btnNuev) {
+        if (seccion === 'pacientes') {
+            btnPac.classList.add('active');
+            btnNuev.classList.remove('active');
+        } else {
+            btnNuev.classList.add('active');
+            btnPac.classList.remove('active');
+        }
+    }
+
+    if (seccion === 'pacientes') window.cargarPacientesParaModal();
+};
+
+window.filtrarPacientes = function () {
+    const input = document.getElementById('buscadorPaciente');
+    if (!input) return;
+
+    const filter = input.value.toLowerCase();
+    const ul = document.getElementById('listaPacientesGuardados');
+    if (!ul) return;
+
+    const li = ul.getElementsByTagName('li');
+
+    for (let i = 0; i < li.length; i++) {
+        let txtValue = li[i].textContent || li[i].innerText;
+        li[i].style.display = txtValue.toLowerCase().indexOf(filter) > -1 ? "" : "none";
+    }
+};
+
+window.cargarPacientesParaModal = async function () {
+    const lista = document.getElementById('listaPacientesGuardados');
+    if (!lista) return;
+
+    // Traemos los datos
+    const { data: misPacs } = await supabaseClient
+        .from('mis_pacientes')
+        .select('cliente_id, auth_user(username, foto_perfil_url)')
+        .eq('fisio_id', currentUser.id);
+
+    if (!misPacs) return;
+
+    lista.innerHTML = misPacs.map(p => {
+        const nombre = p.auth_user.username || 'Paciente';
+        const inicial = nombre.charAt(0).toUpperCase();
+        const foto = p.auth_user.foto_perfil_url;
+
+        const avatarContent = foto
+            ? `<img src="${foto}" onerror="this.parentElement.innerHTML='${inicial}'">`
+            : inicial;
+
+        // Ahora, al hacer clic, llamamos directamente a la reserva
+        return `
+            <li class="patient-row" onclick="reservarPacienteExistente('${p.cliente_id}', '${nombre}')">
+                <div class="avatar-mini">${avatarContent}</div>
+                <span>${nombre}</span>
+            </li>
+        `;
+    }).join('');
+};
+
+window.reservarPacienteExistente = async function (clienteId, nombre) {
+    if (!confirm(`¿Reservar cita para ${nombre}?`)) return;
+
+    const modal = document.getElementById('bookSessionModal');
+    const sessionId = modal.dataset.sessionId;
+
+    try {
+        const { error: errorCita } = await supabaseClient
+            .from('horarios_disponibles')
+            .update({
+                estado: 'reservado',
+                cliente_id: clienteId,
+                nombre_paciente: nombre
+            })
+            .eq('id', sessionId);
+
+        if (errorCita) throw errorCita;
+
+        modal.classList.remove('active');
+        window.cargarCalendarioMes();
+    } catch (error) {
+        console.error(error);
+        alert("Error al reservar: " + error.message);
+    }
+};
+
+// FLUJO 2: Reservar creando un paciente nuevo
+window.finalizarReserva = async function () {
+    const modal = document.getElementById('bookSessionModal');
+    const sessionId = modal.dataset.sessionId;
+
+    const nombre = document.getElementById('nuevoNombre').value.trim();
+    const telefono = document.getElementById('nuevoTelefono').value.trim();
+    const email = document.getElementById('nuevoEmail').value.trim();
+    const fechaNac = document.getElementById('nuevoFechaNac').value.trim();
+
+    if (!nombre) return alert("El nombre es obligatorio.");
+
+    try {
+        // Generador de UUID idéntico al de tu App
+        const idSupabaseFantasma = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+
+        const emailFinal = email ? email : `fantasma.${Math.random().toString(36).substring(2, 8)}@fysium.app`;
+
+        // 1. Crear usuario en auth_user
+        const { error: errorUsuario } = await supabaseClient
+            .from('auth_user')
+            .insert([{
+                id_supabase: idSupabaseFantasma,
+                email: emailFinal,
+                username: nombre,
+                telefono: telefono || null,
+                fecha_nacimiento: fechaNac || null,
+                es_fantasma: true
+            }]);
+
+        if (errorUsuario && errorUsuario.code !== '23505') throw errorUsuario;
+
+        // 2. Vincularlo al Fisio
+        await supabaseClient
+            .from('mis_pacientes')
+            .insert([{ fisio_id: currentUser.id, cliente_id: idSupabaseFantasma }]);
+
+        // 3. Reservar la cita
+        const { error: errorCita } = await supabaseClient
+            .from('horarios_disponibles')
+            .update({
+                estado: 'reservado',
+                cliente_id: idSupabaseFantasma,
+                nombre_paciente: nombre
+            })
+            .eq('id', sessionId);
+
+        if (errorCita) throw errorCita;
+
+        // Éxito: cerramos y recargamos
+        modal.classList.remove('active');
+        window.cargarCalendarioMes();
+
+    } catch (error) {
+        console.error(error);
+        alert("Error al reservar y crear paciente: " + error.message);
+    }
+};
+
+window.seleccionarPaciente = function (nombre) {
+    document.getElementById('manualPatientName').value = nombre;
+};
