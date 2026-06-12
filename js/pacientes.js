@@ -87,15 +87,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Variables globales para la búsqueda
+    window.allMyPatients = [];
+    window.misPacientesRel = [];
+
     // Búsqueda
     document.getElementById('searchPatientInput').addEventListener('input', (e) => {
         const val = e.target.value.toLowerCase();
-        const cards = document.querySelectorAll('.patient-card');
-        cards.forEach(card => {
-            const name = card.querySelector('.patient-name').textContent.toLowerCase();
-            if (name.includes(val)) card.style.display = 'flex';
-            else card.style.display = 'none';
-        });
+        
+        if (val.trim() === '') {
+            // Mostrar solo activos si no hay búsqueda
+            const activos = window.allMyPatients.filter(u => {
+                const rel = window.misPacientesRel.find(r => r.cliente_id === u.id_supabase);
+                return rel && rel.activo;
+            });
+            window.renderizarPacientesList(activos);
+        } else {
+            // Mostrar cualquier paciente histórico (activo o inactivo) que coincida
+            const filtrados = window.allMyPatients.filter(u => {
+                return (u.username || '').toLowerCase().includes(val);
+            });
+            window.renderizarPacientesList(filtrados);
+        }
     });
 
     // Volver a pacientes
@@ -276,18 +289,53 @@ function renderRecommendationsGrid() {
     grid.appendChild(newCard);
 }
 
+window.renderizarPacientesList = function(usuariosAMostrar) {
+    const list = document.getElementById('patientsList');
+    list.innerHTML = '';
+
+    if (!usuariosAMostrar || usuariosAMostrar.length === 0) {
+        list.innerHTML = '<p class="text-center text-light py-4">No se encontraron pacientes.</p>';
+        return;
+    }
+
+    usuariosAMostrar.forEach(u => {
+        const card = document.createElement('div');
+        card.className = 'patient-card';
+        card.style.cursor = 'pointer';
+
+        let avatarHtml = `<div class="avatar">${(u.username||'P').charAt(0).toUpperCase()}</div>`;
+        if (u.foto_perfil_url) {
+            avatarHtml = `<img src="${u.foto_perfil_url}" alt="${u.username}" class="avatar" style="object-fit:cover">`;
+        }
+
+        card.innerHTML = `
+            ${avatarHtml}
+            <div class="patient-info">
+                <div class="patient-name">${u.username || 'Paciente'}</div>
+                <div class="patient-email">${u.email || 'Sin correo'}</div>
+            </div>
+            <div style="color:var(--text-light)"><i class="fa-solid fa-chevron-right"></i></div>
+        `;
+        card.onclick = () => window.cargarFichaPaciente(u);
+        list.appendChild(card);
+    });
+};
+
 window.cargarPacientes = async function () {
     if (!currentUser) return;
     const list = document.getElementById('patientsList');
     list.innerHTML = '<div class="loading-spinner py-4 text-center"><i class="fa fa-spinner fa-spin"></i> Cargando...</div>';
 
     try {
+        // Obtenemos todos los pacientes del fisio (activos e inactivos)
         const { data: misPacientes, error: errorMis } = await supabaseClient
             .from('mis_pacientes')
-            .select('cliente_id')
+            .select('cliente_id, activo')
             .eq('fisio_id', currentUser.id);
 
         if (errorMis) throw errorMis;
+
+        window.misPacientesRel = misPacientes || [];
 
         if (!misPacientes || misPacientes.length === 0) {
             list.innerHTML = '<p class="text-center text-light py-4">Aún no tienes pacientes guardados.</p>';
@@ -304,28 +352,15 @@ window.cargarPacientes = async function () {
 
         if (errorUsr) throw errorUsr;
 
-        list.innerHTML = '';
-        usuarios.forEach(u => {
-            const card = document.createElement('div');
-            card.className = 'patient-card';
-            card.style.cursor = 'pointer';
+        window.allMyPatients = usuarios || [];
 
-            let avatarHtml = `<div class="avatar">${u.username.charAt(0).toUpperCase()}</div>`;
-            if (u.foto_perfil_url) {
-                avatarHtml = `<img src="${u.foto_perfil_url}" alt="${u.username}" class="avatar" style="object-fit:cover">`;
-            }
-
-            card.innerHTML = `
-                ${avatarHtml}
-                <div class="patient-info">
-                    <div class="patient-name">${u.username || 'Paciente'}</div>
-                    <div class="patient-email">${u.email || 'Sin correo'}</div>
-                </div>
-                <div style="color:var(--text-light)"><i class="fa-solid fa-chevron-right"></i></div>
-            `;
-            card.onclick = () => window.cargarFichaPaciente(u);
-            list.appendChild(card);
+        // Por defecto, renderizamos solo los activos
+        const activos = window.allMyPatients.filter(u => {
+            const rel = window.misPacientesRel.find(r => r.cliente_id === u.id_supabase);
+            return rel && rel.activo;
         });
+        
+        window.renderizarPacientesList(activos);
 
     } catch (error) {
         console.error(error);
@@ -343,6 +378,20 @@ window.cargarFichaPaciente = async function (userObj) {
     // Cambiar vista
     document.getElementById('tab-pacientes').classList.remove('active');
     document.getElementById('tab-detalle-paciente').classList.add('active');
+
+    // Comprobar estado de activo para configurar el botón de favorito
+    const rel = window.misPacientesRel ? window.misPacientesRel.find(r => r.cliente_id === currentPatientId) : null;
+    const toggleBtn = document.getElementById('quitarPacienteBtn');
+    
+    if (rel && rel.activo) {
+        toggleBtn.innerHTML = '<i class="fa-solid fa-trash"></i> Retirar de mis pacientes';
+        toggleBtn.style.color = '#e74c3c';
+        toggleBtn.dataset.action = 'remove';
+    } else {
+        toggleBtn.innerHTML = '<i class="fa-solid fa-heart"></i> Añadir a mis pacientes';
+        toggleBtn.style.color = 'var(--primary)';
+        toggleBtn.dataset.action = 'add';
+    }
 
     // Poblar info
     document.getElementById('dpName').textContent = userObj.username;
@@ -516,3 +565,73 @@ window.abrirPacienteDesdeCalendario = async function (clienteId) {
 
     window.cargarFichaPaciente(userData);
 };
+
+document.getElementById('quitarPacienteBtn').addEventListener('click', async () => {
+    if (!currentPatientId) return;
+
+    const action = document.getElementById('quitarPacienteBtn').dataset.action || 'remove';
+
+    if (action === 'remove') {
+        if (!confirm("¿Retirar a este paciente de tu lista principal? Podrás volver a añadirlo después y no perderás su historial.")) {
+            return;
+        }
+
+        try {
+            const { error } = await supabaseClient
+                .from('mis_pacientes')
+                .update({ activo: false })
+                .eq('fisio_id', currentUser.id)
+                .eq('cliente_id', currentPatientId);
+
+            if (error) throw error;
+
+            alert("Paciente retirado de tu lista.");
+
+            // Volver a la pestaña de pacientes
+            document.getElementById('tab-detalle-paciente').classList.remove('active');
+            document.getElementById('tab-pacientes').classList.add('active');
+
+            // Recargar la lista
+            window.cargarPacientes();
+        } catch (error) {
+            console.error(error);
+            alert("Error al retirar al paciente: " + error.message);
+        }
+    } else {
+        // action === 'add'
+        try {
+            const { data: exists } = await supabaseClient
+                .from('mis_pacientes')
+                .select('id')
+                .eq('fisio_id', currentUser.id)
+                .eq('cliente_id', currentPatientId)
+                .single();
+
+            if (exists) {
+                const { error } = await supabaseClient
+                    .from('mis_pacientes')
+                    .update({ activo: true })
+                    .eq('fisio_id', currentUser.id)
+                    .eq('cliente_id', currentPatientId);
+                if (error) throw error;
+            } else {
+                const { error } = await supabaseClient
+                    .from('mis_pacientes')
+                    .insert([{ fisio_id: currentUser.id, cliente_id: currentPatientId, activo: true }]);
+                if (error) throw error;
+            }
+
+            alert("Paciente añadido a tu lista de favoritos.");
+
+            // Volver a la pestaña de pacientes
+            document.getElementById('tab-detalle-paciente').classList.remove('active');
+            document.getElementById('tab-pacientes').classList.add('active');
+
+            // Recargar la lista
+            window.cargarPacientes();
+        } catch (error) {
+            console.error(error);
+            alert("Error al añadir al paciente: " + error.message);
+        }
+    }
+});

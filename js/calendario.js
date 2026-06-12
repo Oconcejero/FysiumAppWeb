@@ -377,6 +377,72 @@ window.mostrarSeccion = function (seccion) {
     if (seccion === 'pacientes') window.cargarPacientesParaModal();
 };
 
+// window.filtrarPacientes = function () {
+//     const input = document.getElementById('buscadorPaciente');
+//     if (!input) return;
+
+//     const filter = input.value.toLowerCase();
+//     const ul = document.getElementById('listaPacientesGuardados');
+//     if (!ul) return;
+
+//     const li = ul.getElementsByTagName('li');
+
+//     for (let i = 0; i < li.length; i++) {
+//         let txtValue = li[i].textContent || li[i].innerText;
+//         li[i].style.display = txtValue.toLowerCase().indexOf(filter) > -1 ? "" : "none";
+//     }
+// };
+
+// window.cargarPacientesParaModal = async function () {
+//     const lista = document.getElementById('listaPacientesGuardados');
+//     if (!lista) return;
+
+//     // Traemos los datos
+//     const { data: misPacs } = await supabaseClient
+//         .from('mis_pacientes')
+//         .select('cliente_id, auth_user(username, foto_perfil_url)')
+//         .eq('fisio_id', currentUser.id);
+
+//     if (!misPacs) return;
+
+//     lista.innerHTML = misPacs.map(p => {
+//         const nombre = p.auth_user.username || 'Paciente';
+//         const inicial = nombre.charAt(0).toUpperCase();
+//         const foto = p.auth_user.foto_perfil_url;
+
+//         const avatarContent = foto
+//             ? `<img src="${foto}" onerror="this.parentElement.innerHTML='${inicial}'">`
+//             : inicial;
+
+//         // Ahora, al hacer clic, llamamos directamente a la reserva
+//         return `
+//             <li class="patient-row" onclick="reservarPacienteExistente('${p.cliente_id}', '${nombre}')">
+//                 <div class="avatar-mini">${avatarContent}</div>
+//                 <span>${nombre}</span>
+//             </li>
+//         `;
+//     }).join('');
+// };
+
+window.mostrarSeccion = function (seccion) {
+    document.getElementById('seccionPacientes').style.display = seccion === 'pacientes' ? 'block' : 'none';
+    document.getElementById('seccionNuevo').style.display = seccion === 'nuevo' ? 'block' : 'none';
+
+    const btnPac = document.getElementById('tabPacientesBtn');
+    const btnNuev = document.getElementById('tabNuevoBtn');
+    if (btnPac && btnNuev) {
+        if (seccion === 'pacientes') {
+            btnPac.classList.add('active');
+            btnNuev.classList.remove('active');
+        } else {
+            btnNuev.classList.add('active');
+            btnPac.classList.remove('active');
+        }
+    }
+
+    if (seccion === 'pacientes') window.cargarPacientesParaModal();
+};
+
 window.filtrarPacientes = function () {
     const input = document.getElementById('buscadorPaciente');
     if (!input) return;
@@ -397,11 +463,12 @@ window.cargarPacientesParaModal = async function () {
     const lista = document.getElementById('listaPacientesGuardados');
     if (!lista) return;
 
-    // Traemos los datos
+    // Traemos los datos APLICANDO EL FILTRO DE ACTIVOS (Borrado Lógico)
     const { data: misPacs } = await supabaseClient
         .from('mis_pacientes')
         .select('cliente_id, auth_user(username, foto_perfil_url)')
-        .eq('fisio_id', currentUser.id);
+        .eq('fisio_id', currentUser.id)
+        .eq('activo', true); // <-- AQUÍ ESTÁ LA LÍNEA MÁGICA
 
     if (!misPacs) return;
 
@@ -414,7 +481,6 @@ window.cargarPacientesParaModal = async function () {
             ? `<img src="${foto}" onerror="this.parentElement.innerHTML='${inicial}'">`
             : inicial;
 
-        // Ahora, al hacer clic, llamamos directamente a la reserva
         return `
             <li class="patient-row" onclick="reservarPacienteExistente('${p.cliente_id}', '${nombre}')">
                 <div class="avatar-mini">${avatarContent}</div>
