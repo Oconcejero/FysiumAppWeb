@@ -196,11 +196,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // 1. Buscamos el token y si el paciente permite alertas de seguimiento
-                const { data: userPref } = await supabaseClient
-                    .from('auth_user')
-                    .select('push_token, alertas_seguimiento')
-                    .eq('id_supabase', currentPatientId)
-                    .single();
+                const { data: rpcData } = await supabaseClient.rpc('obtener_token_y_preferencias', {
+                    usuario_objetivo: currentPatientId
+                });
+                const userPref = rpcData && rpcData.length > 0 ? rpcData[0] : null;
 
                 // 2. Si tiene token y el interruptor está activo (o es null/por defecto), disparamos
                 if (userPref && userPref.push_token && (userPref.alertas_seguimiento === true || userPref.alertas_seguimiento === null)) {

@@ -106,11 +106,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // CORRECCIÓN: Si el array de IDs está vacío, Supabase da error en el .in()
                     if (idsPacientes.length > 0) {
-                        // 2. Buscamos sus tokens y preferencias
-                        const { data: usuarios } = await supabaseClient
-                            .from('auth_user')
-                            .select('push_token, alertas_nuevas_horas')
-                            .in('id_supabase', idsPacientes);
+                        // 2. Buscamos sus tokens de forma segura con el PASE VIP
+                        const usuarios = [];
+                        for (const id of idsPacientes) {
+                            const { data: rpcData } = await supabaseClient.rpc('obtener_token_y_preferencias', { usuario_objetivo: id });
+                            if (rpcData && rpcData.length > 0) usuarios.push(rpcData[0]);
+                        }
 
                         const fechaBonita = dia.split('-').reverse().join('/');
 
@@ -443,11 +444,10 @@ window.reservarPacienteExistente = async function (clienteId, nombre) {
 
         try {
             // Buscamos las preferencias del paciente
-            const { data: userPref } = await supabaseClient
-                .from('auth_user')
-                .select('push_token, alertas_citas')
-                .eq('id_supabase', clienteId)
-                .single();
+            const { data: rpcData } = await supabaseClient.rpc('obtener_token_y_preferencias', {
+                usuario_objetivo: clienteId
+            });
+            const userPref = rpcData && rpcData.length > 0 ? rpcData[0] : null;
 
             // Si tiene token y no ha desactivado las alertas, le avisamos
             if (userPref && userPref.push_token && (userPref.alertas_citas === true || userPref.alertas_citas === null)) {
